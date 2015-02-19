@@ -63,6 +63,9 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 
 - (void)enableTapGestureToCloseMenu:(BOOL)enable;
 
+-(CGFloat)horizontalProgressForMenuType:(RUSlideNavigationController_MenuType)menuType;
+-(CGFloat)horizontalProgressForMenuType:(RUSlideNavigationController_MenuType)menuType xLocation:(CGFloat)xLocation;
+
 @end
 
 
@@ -127,15 +130,13 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 	}
 	
 	self.view.frame = rect;
+	[self updateCurrentViewControllerForSlideUseTransform];
 	[self updateMenuAnimation:menu];
 }
 
 - (void)updateMenuAnimation:(RUSlideNavigationController_MenuType)menu
 {
-	CGFloat horizontalPanLocation = self.horizontalPanLocation;
-	CGFloat progress = (menu == RUSlideNavigationController_MenuType_Left)
-	? (horizontalPanLocation / (self.horizontalSize - self.slideOffset))
-	: (horizontalPanLocation / ((self.horizontalSize - self.slideOffset) * -1));
+	CGFloat progress = [self horizontalProgressForMenuType:menu];
 	
 	[self.menuAnimator animateMenu:menu withProgress:progress];
 }
@@ -628,6 +629,57 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 	_menuViewFrameInsets = menuViewFrameInsets;
 
 	[self.view setNeedsLayout];
+}
+
+#pragma mark - Progress
+-(CGFloat)horizontalProgressForMenuType:(RUSlideNavigationController_MenuType)menuType
+{
+	CGFloat horizontalPanLocation = self.horizontalPanLocation;
+	return [self horizontalProgressForMenuType:menuType xLocation:horizontalPanLocation];
+}
+
+-(CGFloat)horizontalProgressForMenuType:(RUSlideNavigationController_MenuType)menuType xLocation:(CGFloat)xLocation
+{
+	CGFloat horizontalSize = self.horizontalSize;
+	CGFloat slideOffset = self.slideOffset;
+
+	return ((menuType == RUSlideNavigationController_MenuType_Left) ?
+			(xLocation / (horizontalSize - slideOffset)) :
+			(xLocation / ((horizontalSize - slideOffset) * -1)));
+}
+
+#pragma mark - Transformation
+-(void)updateCurrentViewControllerForSlideUseTransform
+{
+	CGFloat viewOriginX = CGRectGetMinX(self.view.frame);
+	RUSlideNavigationController_MenuType menuTypeForHorizontalLocation = [self menuTypeForHorizontalLocation:viewOriginX];
+	CGFloat horizontalProgress = [self horizontalProgressForMenuType:menuTypeForHorizontalLocation xLocation:viewOriginX];
+
+	UIViewController* currentViewControllerForPossibleDisplayActions = self.currentViewControllerForPossibleDisplayActions;
+	kRUConditionalReturn(currentViewControllerForPossibleDisplayActions == nil, YES);
+	//	CGPoint newPosition = self.currentViewControllerForSlideUse.view.layer.position;
+	//	newPosition.x = CGRectGetMidX(self.currentViewControllerForSlideUse.view.layer.bounds) * horizontalProgress;
+	//	[self.currentViewControllerForSlideUse.view.layer setPosition:newPosition];
+
+	RUDLog(@"horizontalProgress: %f",horizontalProgress);
+	CGFloat zTranslateDistance = horizontalProgress * -100.0f;
+	CGFloat const zToXTranslationRatio = 0.5f;
+	CGFloat xTranslateDistance = zTranslateDistance * zToXTranslationRatio;
+	RUDLog(@"xTranslateDistance: %f",xTranslateDistance);
+	//	CGFloat xTranslateDistance = horizontalProgress * -100.0f;
+	//	CGFloat xTranslateDistance = 0;
+	
+	CGFloat angle = -horizontalProgress * M_PI_4;
+	
+	CATransform3D transform = CATransform3DIdentity;
+	transform.m34 = 1.0 / - 1800;
+	transform = CATransform3DTranslate(transform, xTranslateDistance, 0, 0);
+	transform = CATransform3DRotate(transform, angle, 0, 1.0f, 0);
+//	transform = CATransform3DTranslate(transform, xTranslateDistance, 0, zTranslateDistance);
+//	transform = CATransform3DTranslate(transform, 0, 0, zTranslateDistance);
+	//	[self.currentViewControllerForSlideUse.view setTransform:CGAffineTransformMakeTranslation(xTranslateDistance, 0)];
+	[currentViewControllerForPossibleDisplayActions.view.layer setTransform:transform];
+	[currentViewControllerForPossibleDisplayActions.navigationController.navigationBar.layer setTransform:transform];
 }
 
 @end
