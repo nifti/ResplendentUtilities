@@ -15,5 +15,6 @@
 @interface UIView (RUSnapshot)
 
 -(UIImage*)ruGetSnapshotFromWindow;
+-(UIImage*)ruGetSnapshot;
 
 @end

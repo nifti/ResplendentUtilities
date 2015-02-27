@@ -9,6 +9,7 @@
 #import "RUSlideMenuNavigationController.h"
 #import "RUProtocolOrNil.h"
 #import "RUConditionalReturn.h"
+#import "UIView+RUSnapshot.h"
 
 
 
@@ -18,11 +19,18 @@ CGFloat const kRUSlideMenuNavigationController_MENU_FAST_VELOCITY_FOR_SWIPE_FOLL
 CGFloat const kRUSlideMenuNavigationController_MENU_QUICK_SLIDE_ANIMATION_DURATION = .18f;
 CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .3f;
 
+typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
+	RUSlideMenuNavigationController_panGestureState_View,
+	RUSlideMenuNavigationController_panGestureState_ImageView,
+};
+
 
 
 
 
 @interface RUSlideMenuNavigationController ()
+
+@property (nonatomic, readonly) UIImageView* animatableScreenShotImageView;
 
 @property (nonatomic, readonly) UIViewController* currentViewControllerForPossibleDisplayActions;
 @property (nonatomic, readonly) UIViewController<RUSlideNavigationController_DisplayDelegate>* currentViewControllerForDisplayActions;
@@ -30,7 +38,7 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 -(UIView *)currentViewControllerMenuViewForMenuType:(RUSlideNavigationController_MenuType)menuType;
 -(UIView *)defaultMenuViewForMenuType:(RUSlideNavigationController_MenuType)menuType;
 
-@property (nonatomic, strong) UITapGestureRecognizer *tapRecognizer;
+//@property (nonatomic, strong) UITapGestureRecognizer *tapRecognizer;
 @property (nonatomic, strong) UIPanGestureRecognizer *panRecognizer;
 //@property (nonatomic, assign) CGPoint draggingPoint;
 
@@ -61,10 +69,12 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 - (void)closeMenuWithDuration:(float)duration andCompletion:(void (^)())completion;
 - (void)toggleMenu:(RUSlideNavigationController_MenuType)menu withCompletion:(void (^)())completion;
 
-- (void)enableTapGestureToCloseMenu:(BOOL)enable;
+//- (void)enableTapGestureToCloseMenu:(BOOL)enable;
 
 -(CGFloat)horizontalProgressForMenuType:(RUSlideNavigationController_MenuType)menuType;
 -(CGFloat)horizontalProgressForMenuType:(RUSlideNavigationController_MenuType)menuType xLocation:(CGFloat)xLocation;
+
+-(void)setPanRecognizerState:(RUSlideMenuNavigationController_panGestureState)panRecognizerState;
 
 @end
 
@@ -87,6 +97,11 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 	[super viewWillLayoutSubviews];
 
 	[self updateMenuFrameAndTransformAccordingToOrientation];
+
+	if (self.animatableScreenShotImageView)
+	{
+		[self.animatableScreenShotImageView.superview bringSubviewToFront:self.animatableScreenShotImageView];
+	}
 }
 
 #pragma mark - Update Content
@@ -114,6 +129,7 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 
 - (void)moveHorizontallyToLocation:(CGFloat)location
 {
+
 	CGRect rect = self.view.frame;
 	UIInterfaceOrientation orientation = self.interfaceOrientation;
 	RUSlideNavigationController_MenuType menu = [self menuTypeForHorizontalLocation:location];
@@ -128,8 +144,43 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 		rect.origin.x = (orientation == UIInterfaceOrientationPortrait) ? location : location*-1;
 		rect.origin.y = 0;
 	}
+
+	BOOL willHide = (CGRectGetMinX(rect) != 0);
 	
-	self.view.frame = rect;
+	if (willHide)
+	{
+		if (self.animatableScreenShotImageView == nil)
+		{
+			UIImage* snapshotImage = self.imageForCurrentSnapshot;
+			_animatableScreenShotImageView = [[UIImageView alloc]initWithImage:snapshotImage];
+			NSAssert(CGSizeEqualToSize(snapshotImage.size, self.view.bounds.size), @"unhandled");
+			[self.animatableScreenShotImageView setBackgroundColor:[UIColor redColor]];
+			[self.animatableScreenShotImageView setContentMode:UIViewContentModeScaleAspectFill];
+			[self.animatableScreenShotImageView.layer setZPosition:CGRectGetWidth(rect)];
+			[self.animatableScreenShotImageView addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected:)]];
+//			[self.animatableScreenShotImageView setFrame:self.view.bounds];
+			[self.view.window addSubview:self.animatableScreenShotImageView];
+		}
+
+		[self.animatableScreenShotImageView setFrame:rect];
+	}
+	else
+	{
+		if (self.animatableScreenShotImageView)
+		{
+			[self.animatableScreenShotImageView removeFromSuperview];
+			_animatableScreenShotImageView = nil;
+		}
+	}
+
+	if (self.tabBarController)
+	{
+		[self.tabBarController.tabBar setHidden:willHide];
+	}
+
+	[self.view setHidden:willHide];
+//	self.view.frame = rect;
+
 	[self updateCurrentViewControllerForSlideUseTransform];
 	[self updateMenuAnimation:menu];
 }
@@ -143,7 +194,7 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 
 - (void)openMenu:(RUSlideNavigationController_MenuType)menu withDuration:(float)duration andCompletion:(void (^)())completion
 {
-	[self enableTapGestureToCloseMenu:YES];
+//	[self enableTapGestureToCloseMenu:YES];
 	
 	[self prepareMenuForReveal:menu forcePrepare:NO];
 	
@@ -174,7 +225,7 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 
 - (void)closeMenuWithDuration:(float)duration andCompletion:(void (^)())completion
 {
-	[self enableTapGestureToCloseMenu:NO];
+//	[self enableTapGestureToCloseMenu:NO];
 
 	[UIView animateWithDuration:duration
 						  delay:0
@@ -467,39 +518,67 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 }
 
 #pragma mark - Getters
-- (UITapGestureRecognizer *)tapRecognizer
-{
-	if (!_tapRecognizer)
-	{
-		_tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected:)];
-	}
-	
-	return _tapRecognizer;
-}
+//- (UITapGestureRecognizer *)tapRecognizer
+//{
+//	if (self.tapRecognizer == nil)
+//	{
+//		_tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected:)];
+//	}
+//	
+//	return self.tapRecognizer;
+//}
 
 - (UIPanGestureRecognizer *)panRecognizer
 {
-	if (!_panRecognizer)
+	if (self.panRecognizer == nil)
 	{
 		_panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panDetected:)];
 	}
 	
-	return _panRecognizer;
+	return self.panRecognizer;
 }
 
 #pragma mark - Setters
-- (void)setEnableSwipeGesture:(BOOL)markEnableSwipeGesture
+-(void)setPanRecognizerState:(RUSlideMenuNavigationController_panGestureState)panRecognizerState
 {
-	_enableSwipeGesture = markEnableSwipeGesture;
-	
-	if (_enableSwipeGesture)
+	UIView* view = [self viewForPanRecognizerState:panRecognizerState];
+	kRUConditionalReturn(self.panRecognizer.view == view, NO);
+
+	UIPanGestureRecognizer* panRecognizer = self.panRecognizer;
+	[panRecognizer.view removeGestureRecognizer:panRecognizer];
+
+	if (view)
 	{
-		[self.view addGestureRecognizer:self.panRecognizer];
+		[view addGestureRecognizer:panRecognizer];
 	}
-	else
+}
+
+-(UIView*)viewForPanRecognizerState:(RUSlideMenuNavigationController_panGestureState)panRecognizerState
+{
+	switch (panRecognizerState)
 	{
-		[self.view removeGestureRecognizer:self.panRecognizer];
+		case RUSlideMenuNavigationController_panGestureState_ImageView:
+			return self.animatableScreenShotImageView;
+
+		case RUSlideMenuNavigationController_panGestureState_View:
+			return self.view;
 	}
+
+	NSAssert(false, @"unhandled");
+	return nil;
+}
+
+#pragma mark - Setters
+-(BOOL)enablePanGesture
+{
+	return self.panRecognizer.enabled;
+}
+
+- (void)setEnablePanGesture:(BOOL)enablePanGesture
+{
+	kRUConditionalReturn(self.enablePanGesture == enablePanGesture, NO);
+
+	[self.panRecognizer setEnabled:self.enablePanGesture];
 }
 
 #pragma mark - Actions
@@ -567,20 +646,20 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 	}
 }
 
-#pragma mark - Enabling
-- (void)enableTapGestureToCloseMenu:(BOOL)enable
-{
-	if (enable)
-	{
-		self.topViewController.view.userInteractionEnabled = NO;
-		[self.view addGestureRecognizer:self.tapRecognizer];
-	}
-	else
-	{
-		self.topViewController.view.userInteractionEnabled = YES;
-		[self.view removeGestureRecognizer:self.tapRecognizer];
-	}
-}
+//#pragma mark - Enabling
+//- (void)enableTapGestureToCloseMenu:(BOOL)enable
+//{
+//	if (enable)
+//	{
+//		self.topViewController.view.userInteractionEnabled = NO;
+//		[self.view addGestureRecognizer:self.tapRecognizer];
+//	}
+//	else
+//	{
+//		self.topViewController.view.userInteractionEnabled = YES;
+//		[self.view removeGestureRecognizer:self.tapRecognizer];
+//	}
+//}
 
 #pragma mark - currentViewControllerForDisplayActions
 -(UIViewController*)currentViewControllerForPossibleDisplayActions
@@ -651,7 +730,7 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 #pragma mark - Transformation
 -(void)updateCurrentViewControllerForSlideUseTransform
 {
-	CGFloat viewOriginX = CGRectGetMinX(self.view.frame);
+	CGFloat viewOriginX = CGRectGetMinX(self.animatableScreenShotImageView.frame);
 	RUSlideNavigationController_MenuType menuTypeForHorizontalLocation = [self menuTypeForHorizontalLocation:viewOriginX];
 	CGFloat horizontalProgress = [self horizontalProgressForMenuType:menuTypeForHorizontalLocation xLocation:viewOriginX];
 
@@ -678,8 +757,42 @@ CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .
 //	transform = CATransform3DTranslate(transform, xTranslateDistance, 0, zTranslateDistance);
 //	transform = CATransform3DTranslate(transform, 0, 0, zTranslateDistance);
 	//	[self.currentViewControllerForSlideUse.view setTransform:CGAffineTransformMakeTranslation(xTranslateDistance, 0)];
-	[currentViewControllerForPossibleDisplayActions.view.layer setTransform:transform];
-	[currentViewControllerForPossibleDisplayActions.navigationController.navigationBar.layer setTransform:transform];
+
+//	BOOL willHide = (viewOriginX != 0);
+//	
+//	if (willHide)
+//	{
+//		self
+//		if (self.animatableScreenShotImageView == nil)
+//		{
+//			_animatableScreenShotImageView = [UIImageView new];
+//			[self.animatableScreenShotImageView setBackgroundColor:[UIColor redColor]];
+//			[self.animatableScreenShotImageView setFrame:self.view.bounds];
+//			[self.view addSubview:self.animatableScreenShotImageView];
+//		}
+//	}
+//	else
+//	{
+//		if (self.animatableScreenShotImageView)
+//		{
+//			[self.animatableScreenShotImageView removeFromSuperview];
+//			_animatableScreenShotImageView = nil;
+//		}
+//	}
+
+	[self.animatableScreenShotImageView.layer setTransform:transform];
+//	[currentViewControllerForPossibleDisplayActions.view setHidden:willHide];
+
+//	[currentViewControllerForPossibleDisplayActions.view.layer setTransform:transform];
+//	[currentViewControllerForPossibleDisplayActions.navigationController.navigationBar.layer setTransform:transform];
+}
+
+#pragma mark - imageForCurrentSnapshot
+-(UIImage*)imageForCurrentSnapshot
+{
+	UIImage* imageForCurrentSnapshot = [self.view ruGetSnapshotFromWindow];
+
+	return imageForCurrentSnapshot;
 }
 
 @end

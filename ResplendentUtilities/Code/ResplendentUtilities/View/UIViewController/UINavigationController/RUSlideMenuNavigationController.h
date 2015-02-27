@@ -17,7 +17,7 @@
 
 @property (nonatomic, assign) BOOL fitMenuViewsUnderStatusBar;
 
-@property (nonatomic, assign) BOOL enableSwipeGesture;
+@property (nonatomic, assign) BOOL enablePanGesture;
 
 @property (nonatomic, assign) CGFloat portraitSlideOffset;
 @property (nonatomic, assign) CGFloat landscapeSlideOffset;
@@ -35,5 +35,8 @@
 - (void)toggleLeftMenu;
 - (void)toggleRightMenu;
 - (BOOL)isMenuOpen;
+
+//for subclassing
+@property (nonatomic, readonly) UIImage* imageForCurrentSnapshot;
 
 @end

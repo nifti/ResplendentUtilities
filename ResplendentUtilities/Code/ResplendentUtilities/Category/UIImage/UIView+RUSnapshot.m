@@ -16,7 +16,12 @@
 
 -(UIImage*)ruGetSnapshotFromWindow
 {
-	UIView* viewToMakeImage = self.window;
+	return [self.window ruGetSnapshot];
+}
+
+-(UIImage*)ruGetSnapshot
+{
+	UIView* viewToMakeImage = self;
 	
 	UIGraphicsBeginImageContextWithOptions(viewToMakeImage.bounds.size, viewToMakeImage.opaque, 0.0f);
 	
