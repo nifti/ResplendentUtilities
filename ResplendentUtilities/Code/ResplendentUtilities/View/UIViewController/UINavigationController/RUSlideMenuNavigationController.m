@@ -31,6 +31,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 @interface RUSlideMenuNavigationController ()
 
+@property (nonatomic, readonly) UIView* animatableScreenShotBackgroundView;
 @property (nonatomic, readonly) UIImageView* animatableScreenShotImageView;
 
 @property (nonatomic, readonly) UIViewController* currentViewControllerForPossibleDisplayActions;
@@ -159,62 +160,61 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 		}
 	};
 
+	typeof(self.animatableScreenShotBackgroundView) animatableScreenShotBackgroundView_old = self.animatableScreenShotBackgroundView;
 	typeof(self.animatableScreenShotImageView) animatableScreenShotImageView_old = self.animatableScreenShotImageView;
 
 	if (willHide)
 	{
+		if (self.animatableScreenShotBackgroundView == nil)
+		{
+			_animatableScreenShotBackgroundView = [UIView new];
+			[self.animatableScreenShotBackgroundView setBackgroundColor:[UIColor clearColor]];
+			[self.animatableScreenShotBackgroundView addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected:)]];
+			[self.view.window addSubview:self.animatableScreenShotBackgroundView];
+		}
+
 		if (self.animatableScreenShotImageView == nil)
 		{
+			NSAssert(self.animatableScreenShotBackgroundView != nil, @"unhandled");
 			UIImage* snapshotImage = self.imageForCurrentSnapshot;
 			_animatableScreenShotImageView = [[UIImageView alloc]initWithImage:snapshotImage];
 			NSAssert(CGSizeEqualToSize(snapshotImage.size, self.view.bounds.size), @"unhandled");
 			[self.animatableScreenShotImageView setUserInteractionEnabled:YES];
 			[self.animatableScreenShotImageView setBackgroundColor:[UIColor redColor]];
 			[self.animatableScreenShotImageView setContentMode:UIViewContentModeScaleAspectFill];
-			[self.animatableScreenShotImageView.layer setZPosition:CGRectGetWidth(rect)];
-			[self.animatableScreenShotImageView addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected:)]];
-//			[self.animatableScreenShotImageView setFrame:self.view.bounds];
-			[self.view.window addSubview:self.animatableScreenShotImageView];
+			[self.animatableScreenShotBackgroundView addSubview:self.animatableScreenShotImageView];
 		}
-
-		__weak typeof(self.animatableScreenShotImageView) weakAnimatableScreenShotImageView = self.animatableScreenShotImageView;
-		animationBlock = ^{
-			[weakAnimatableScreenShotImageView setFrame:rect];
-			animationBlock();
-		};
 	}
 	else
 	{
+		if (self.animatableScreenShotBackgroundView)
+		{
+			__weak typeof(animatableScreenShotBackgroundView_old) weakAnimatableScreenShotBackgroundView_old = animatableScreenShotBackgroundView_old;
+			animationCompletionBlock = ^{
+				
+				[weakAnimatableScreenShotBackgroundView_old removeFromSuperview];
+				animationCompletionBlock();
+				
+			};
+			
+			_animatableScreenShotBackgroundView = nil;
+		}
+
 		if (self.animatableScreenShotImageView)
 		{
-			__weak typeof(animatableScreenShotImageView_old) weakAnimatableScreenShotImageView_old = animatableScreenShotImageView_old;
-//			__weak typeof(self) weakSelf = self;
-//			__weak typeof(self.animatableScreenShotImageView) animatableScreenShotImageView = self.animatableScreenShotImageView;
-			animationBlock = ^{
-
-				[weakAnimatableScreenShotImageView_old setFrame:rect];
-//				if (weakSelf)
-//				{
-//					[animatableScreenShotImageView setFrame:rect];
-//				}
-				animationBlock();
-
-			};
-
-			animationCompletionBlock = ^{
-
-				[weakAnimatableScreenShotImageView_old removeFromSuperview];
-//				if (weakSelf)
-//				{
-//					[animatableScreenShotImageView removeFromSuperview];
-//				}
-				animationCompletionBlock();
-
-			};
-
 			_animatableScreenShotImageView = nil;
 		}
 	}
+
+	__weak typeof(self.animatableScreenShotBackgroundView) weakAnimatableScreenShotBackgroundView_forFrameSet = (willHide ? self.animatableScreenShotBackgroundView : animatableScreenShotBackgroundView_old);
+	__weak typeof(self.animatableScreenShotImageView) weakAnimatableScreenShotImageView_forFrameSet = (willHide ? self.animatableScreenShotImageView : animatableScreenShotImageView_old);
+	animationBlock = ^{
+		[weakAnimatableScreenShotBackgroundView_forFrameSet setFrame:rect];
+		[weakAnimatableScreenShotImageView_forFrameSet setFrame:(CGRect){
+			.size	= rect.size,
+		}];
+		animationBlock();
+	};
 
 	__weak typeof(self) weakSelf = self;
 	__weak typeof(animatableScreenShotImageView_old) weakAnimatableScreenShotImageView_forTransformation = (willHide ? self.animatableScreenShotImageView : animatableScreenShotImageView_old);
@@ -859,23 +859,16 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 - (void)updateTransformationForView:(UIView*)view atHorizontalLocation:(CGFloat)location
 {
 	kRUConditionalReturn(view == nil, YES);
-//	CGFloat viewOriginX = CGRectGetMinX(self.animatableScreenShotImageView.frame);
 	RUSlideNavigationController_MenuType menuTypeForHorizontalLocation = [self menuTypeForHorizontalLocation:location];
 	CGFloat horizontalProgress = [self horizontalProgressForMenuType:menuTypeForHorizontalLocation xLocation:location];
+	RUDLog(@"horizontalProgress: %f",horizontalProgress);
 
 	UIViewController* currentViewControllerForPossibleDisplayActions = self.currentViewControllerForPossibleDisplayActions;
 	kRUConditionalReturn(currentViewControllerForPossibleDisplayActions == nil, YES);
-	//	CGPoint newPosition = self.currentViewControllerForSlideUse.view.layer.position;
-	//	newPosition.x = CGRectGetMidX(self.currentViewControllerForSlideUse.view.layer.bounds) * horizontalProgress;
-	//	[self.currentViewControllerForSlideUse.view.layer setPosition:newPosition];
 
-	RUDLog(@"horizontalProgress: %f",horizontalProgress);
-	CGFloat zTranslateDistance = horizontalProgress * -100.0f;
-	CGFloat const zToXTranslationRatio = 0.5f;
-	CGFloat xTranslateDistance = zTranslateDistance * zToXTranslationRatio;
+	CGFloat const progressToXTranslateDistanceRatio = -981.0f;
+	CGFloat xTranslateDistance = pow(horizontalProgress, 2.0f) * progressToXTranslateDistanceRatio;
 	RUDLog(@"xTranslateDistance: %f",xTranslateDistance);
-	//	CGFloat xTranslateDistance = horizontalProgress * -100.0f;
-	//	CGFloat xTranslateDistance = 0;
 	
 	CGFloat angle = -horizontalProgress * M_PI_4;
 	
@@ -883,37 +876,14 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	transform.m34 = 1.0 / - 1800;
 	transform = CATransform3DTranslate(transform, xTranslateDistance, 0, 0);
 	transform = CATransform3DRotate(transform, angle, 0, 1.0f, 0);
-//	transform = CATransform3DTranslate(transform, xTranslateDistance, 0, zTranslateDistance);
-//	transform = CATransform3DTranslate(transform, 0, 0, zTranslateDistance);
-	//	[self.currentViewControllerForSlideUse.view setTransform:CGAffineTransformMakeTranslation(xTranslateDistance, 0)];
 
-//	BOOL willHide = (viewOriginX != 0);
-//	
-//	if (willHide)
-//	{
-//		self
-//		if (self.animatableScreenShotImageView == nil)
-//		{
-//			_animatableScreenShotImageView = [UIImageView new];
-//			[self.animatableScreenShotImageView setBackgroundColor:[UIColor redColor]];
-//			[self.animatableScreenShotImageView setFrame:self.view.bounds];
-//			[self.view addSubview:self.animatableScreenShotImageView];
-//		}
-//	}
-//	else
-//	{
-//		if (self.animatableScreenShotImageView)
-//		{
-//			[self.animatableScreenShotImageView removeFromSuperview];
-//			_animatableScreenShotImageView = nil;
-//		}
-//	}
+	CGFloat const progressToZTranslateDistanceRatio = -1200.0f;
+	CGFloat zTranslateDistance = horizontalProgress * progressToZTranslateDistanceRatio;
+	RUDLog(@"zTranslateDistance: %f",zTranslateDistance);
+	transform = CATransform3DTranslate(transform, 0, 0, zTranslateDistance);
 
+	[view.layer setZPosition:ceil(CGFLOAT_MAX / 2.0f)];
 	[view.layer setTransform:transform];
-//	[currentViewControllerForPossibleDisplayActions.view setHidden:willHide];
-
-//	[currentViewControllerForPossibleDisplayActions.view.layer setTransform:transform];
-//	[currentViewControllerForPossibleDisplayActions.navigationController.navigationBar.layer setTransform:transform];
 }
 
 #pragma mark - imageForCurrentSnapshot
