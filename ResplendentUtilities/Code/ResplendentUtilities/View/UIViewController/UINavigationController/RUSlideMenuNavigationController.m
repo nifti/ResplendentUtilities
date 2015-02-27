@@ -20,6 +20,7 @@ CGFloat const kRUSlideMenuNavigationController_MENU_QUICK_SLIDE_ANIMATION_DURATI
 CGFloat const kRUSlideMenuNavigationController_MENU_SLIDE_ANIMATION_DURATION = .3f;
 
 typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
+	RUSlideMenuNavigationController_panGestureState_None,
 	RUSlideMenuNavigationController_panGestureState_View,
 	RUSlideMenuNavigationController_panGestureState_ImageView,
 };
@@ -63,7 +64,8 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 - (void)updateMenuFrameAndTransformAccordingToOrientation;
 - (void)updateMenuFrameAndTransformAccordingToOrientationWithMenu:(RUSlideNavigationController_MenuType)menu;
 
-- (void)moveHorizontallyToLocation:(CGFloat)location;
+- (void)moveHorizontallyToLocation:(CGFloat)location animatedWithDuration:(NSTimeInterval)duration completion:(void(^)())completion;
+- (void)updateTransformationForView:(UIView*)view atHorizontalLocation:(CGFloat)location;
 - (void)updateMenuAnimation:(RUSlideNavigationController_MenuType)menu;
 - (void)openMenu:(RUSlideNavigationController_MenuType)menu withDuration:(float)duration andCompletion:(void (^)())completion;
 - (void)closeMenuWithDuration:(float)duration andCompletion:(void (^)())completion;
@@ -88,8 +90,8 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 - (void)viewDidLoad
 {
 	[super viewDidLoad];
-	
-	[self setEnableSwipeGesture:YES];
+
+	[self setPanRecognizerState:RUSlideMenuNavigationController_panGestureState_View];
 }
 
 -(void)viewWillLayoutSubviews
@@ -127,9 +129,8 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	}
 }
 
-- (void)moveHorizontallyToLocation:(CGFloat)location
+- (void)moveHorizontallyToLocation:(CGFloat)location animatedWithDuration:(NSTimeInterval)duration completion:(void(^)())completion
 {
-
 	CGRect rect = self.view.frame;
 	UIInterfaceOrientation orientation = self.interfaceOrientation;
 	RUSlideNavigationController_MenuType menu = [self menuTypeForHorizontalLocation:location];
@@ -146,7 +147,20 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	}
 
 	BOOL willHide = (CGRectGetMinX(rect) != 0);
-	
+
+	void (^animationBlock)() = ^(){
+		
+	};
+
+	void (^animationCompletionBlock)() = ^(){
+		if (completion)
+		{
+			completion();
+		}
+	};
+
+	typeof(self.animatableScreenShotImageView) animatableScreenShotImageView_old = self.animatableScreenShotImageView;
+
 	if (willHide)
 	{
 		if (self.animatableScreenShotImageView == nil)
@@ -154,6 +168,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 			UIImage* snapshotImage = self.imageForCurrentSnapshot;
 			_animatableScreenShotImageView = [[UIImageView alloc]initWithImage:snapshotImage];
 			NSAssert(CGSizeEqualToSize(snapshotImage.size, self.view.bounds.size), @"unhandled");
+			[self.animatableScreenShotImageView setUserInteractionEnabled:YES];
 			[self.animatableScreenShotImageView setBackgroundColor:[UIColor redColor]];
 			[self.animatableScreenShotImageView setContentMode:UIViewContentModeScaleAspectFill];
 			[self.animatableScreenShotImageView.layer setZPosition:CGRectGetWidth(rect)];
@@ -162,26 +177,110 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 			[self.view.window addSubview:self.animatableScreenShotImageView];
 		}
 
-		[self.animatableScreenShotImageView setFrame:rect];
+		__weak typeof(self.animatableScreenShotImageView) weakAnimatableScreenShotImageView = self.animatableScreenShotImageView;
+		animationBlock = ^{
+			[weakAnimatableScreenShotImageView setFrame:rect];
+			animationBlock();
+		};
 	}
 	else
 	{
 		if (self.animatableScreenShotImageView)
 		{
-			[self.animatableScreenShotImageView removeFromSuperview];
+			__weak typeof(animatableScreenShotImageView_old) weakAnimatableScreenShotImageView_old = animatableScreenShotImageView_old;
+//			__weak typeof(self) weakSelf = self;
+//			__weak typeof(self.animatableScreenShotImageView) animatableScreenShotImageView = self.animatableScreenShotImageView;
+			animationBlock = ^{
+
+				[weakAnimatableScreenShotImageView_old setFrame:rect];
+//				if (weakSelf)
+//				{
+//					[animatableScreenShotImageView setFrame:rect];
+//				}
+				animationBlock();
+
+			};
+
+			animationCompletionBlock = ^{
+
+				[weakAnimatableScreenShotImageView_old removeFromSuperview];
+//				if (weakSelf)
+//				{
+//					[animatableScreenShotImageView removeFromSuperview];
+//				}
+				animationCompletionBlock();
+
+			};
+
 			_animatableScreenShotImageView = nil;
 		}
 	}
 
-	if (self.tabBarController)
+	__weak typeof(self) weakSelf = self;
+	__weak typeof(animatableScreenShotImageView_old) weakAnimatableScreenShotImageView_forTransformation = (willHide ? self.animatableScreenShotImageView : animatableScreenShotImageView_old);
+	if (weakAnimatableScreenShotImageView_forTransformation)
 	{
-		[self.tabBarController.tabBar setHidden:willHide];
+		animationBlock = ^{
+			[weakSelf updateTransformationForView:weakAnimatableScreenShotImageView_forTransformation atHorizontalLocation:location];
+			//		[weakSelf updateCurrentViewControllerForSlideUseTransform];
+			animationBlock();
+		};
 	}
 
-	[self.view setHidden:willHide];
+	if (willHide)
+	{
+		if (self.tabBarController)
+		{
+			[self.tabBarController.tabBar setHidden:willHide];
+		}
+		
+		[self.view setHidden:willHide];
+	}
+	else
+	{
+		__weak typeof(self) weakSelf = self;
+		animationCompletionBlock = ^{
+
+			if (weakSelf.tabBarController)
+			{
+				[weakSelf.tabBarController.tabBar setHidden:willHide];
+			}
+			
+			[weakSelf.view setHidden:willHide];
+			animationCompletionBlock();
+
+		};
+	}
+
+	BOOL animate = (duration > 0);
+	if (animate)
+	{
+		[UIView animateWithDuration:duration delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+		 
+			animationBlock();
+		 
+		} completion:^(BOOL finished) {
+
+			animationCompletionBlock();
+			
+		}];
+	}
+	else
+	{
+		animationBlock();
+		animationCompletionBlock();
+	}
+
+//	[self setPanRecognizerState:(willHide ? RUSlideMenuNavigationController_panGestureState_None : RUSlideMenuNavigationController_panGestureState_View)];
+
+//	if (self.tabBarController)
+//	{
+//		[self.tabBarController.tabBar setHidden:willHide];
+//	}
+//
+//	[self.view setHidden:willHide];
 //	self.view.frame = rect;
 
-	[self updateCurrentViewControllerForSlideUseTransform];
 	[self updateMenuAnimation:menu];
 }
 
@@ -197,20 +296,25 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 //	[self enableTapGestureToCloseMenu:YES];
 	
 	[self prepareMenuForReveal:menu forcePrepare:NO];
-	
-	[UIView animateWithDuration:duration
-						  delay:0
-						options:UIViewAnimationOptionCurveEaseOut
-					 animations:^{
-						 CGRect rect = self.view.frame;
-						 CGFloat width = self.horizontalSize;
-						 rect.origin.x = (menu == RUSlideNavigationController_MenuType_Left) ? (width - self.slideOffset) : ((width - self.slideOffset )* -1);
-						 [self moveHorizontallyToLocation:rect.origin.x];
-					 }
-					 completion:^(BOOL finished) {
-						 if (completion)
-							 completion();
-					 }];
+
+	CGRect rect = self.view.frame;
+	CGFloat width = self.horizontalSize;
+	rect.origin.x = (menu == RUSlideNavigationController_MenuType_Left) ? (width - self.slideOffset) : ((width - self.slideOffset )* -1);
+	[self moveHorizontallyToLocation:rect.origin.x animatedWithDuration:duration completion:completion];
+
+//	[UIView animateWithDuration:duration
+//						  delay:0
+//						options:UIViewAnimationOptionCurveEaseOut
+//					 animations:^{
+//						 CGRect rect = self.view.frame;
+//						 CGFloat width = self.horizontalSize;
+//						 rect.origin.x = (menu == RUSlideNavigationController_MenuType_Left) ? (width - self.slideOffset) : ((width - self.slideOffset )* -1);
+//						 [self moveHorizontallyToLocation:rect.origin.x];
+//					 }
+//					 completion:^(BOOL finished) {
+//						 if (completion)
+//							 completion();
+//					 }];
 }
 
 - (void)openMenu:(RUSlideNavigationController_MenuType)menu withCompletion:(void (^)())completion
@@ -225,57 +329,78 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 - (void)closeMenuWithDuration:(float)duration andCompletion:(void (^)())completion
 {
-//	[self enableTapGestureToCloseMenu:NO];
+	[self moveHorizontallyToLocation:0 animatedWithDuration:duration completion:^{
 
-	[UIView animateWithDuration:duration
-						  delay:0
-						options:UIViewAnimationOptionCurveEaseOut
-					 animations:^{
-						 CGRect rect = self.view.frame;
-						 rect.origin.x = 0;
-						 [self moveHorizontallyToLocation:rect.origin.x];
-					 }
-					 completion:^(BOOL finished) {
+		[self.currentViewControllerMenuView removeFromSuperview];
+		
+		if (completion)
+		{
+			completion();
+		}
 
-						 [self.currentViewControllerMenuView removeFromSuperview];
-
-						 if (completion)
-							 completion();
-					 }];
+	}];
+//
+//	[UIView animateWithDuration:duration
+//						  delay:0
+//						options:UIViewAnimationOptionCurveEaseOut
+//					 animations:^{
+//
+//						 [self moveHorizontallyToLocation:0];
+//
+//					 }
+//					 completion:^(BOOL finished) {
+//
+//						 [self.currentViewControllerMenuView removeFromSuperview];
+//
+//						 if (completion)
+//							 completion();
+//					 }];
 }
 
 #pragma mark - Menu
 - (void)bounceMenu:(RUSlideNavigationController_MenuType)menu withCompletion:(void (^)())completion
 {
 	[self prepareMenuForReveal:menu forcePrepare:YES];
-	NSInteger movementDirection = (menu == RUSlideNavigationController_MenuType_Left) ? 1 : -1;
-	
-	[UIView animateWithDuration:.16 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-		[self moveHorizontallyToLocation:30*movementDirection];
-	} completion:^(BOOL finished){
-		[UIView animateWithDuration:.1 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
-			[self moveHorizontallyToLocation:0];
-		} completion:^(BOOL finished){
-			[UIView animateWithDuration:.12 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-				[self moveHorizontallyToLocation:16*movementDirection];
-			} completion:^(BOOL finished){
-				[UIView animateWithDuration:.08 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
-					[self moveHorizontallyToLocation:0];
-				} completion:^(BOOL finished){
-					[UIView animateWithDuration:.08 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-						[self moveHorizontallyToLocation:6*movementDirection];
-					} completion:^(BOOL finished){
-						[UIView animateWithDuration:.06 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
-							[self moveHorizontallyToLocation:0];
-						} completion:^(BOOL finished){
-							if (completion)
-								completion();
-						}];
+	double movementDirection = (menu == RUSlideNavigationController_MenuType_Left) ? 1 : -1;
+
+	[self moveHorizontallyToLocation:30.0f * movementDirection animatedWithDuration:0.16f completion:^{
+		[self moveHorizontallyToLocation:0 animatedWithDuration:0.1f completion:^{
+			[self moveHorizontallyToLocation:16.0f * movementDirection animatedWithDuration:0.12f completion:^{
+				[self moveHorizontallyToLocation:0 animatedWithDuration:0.08f completion:^{
+					[self moveHorizontallyToLocation:6.0f * movementDirection animatedWithDuration:0.08f completion:^{
+						[self moveHorizontallyToLocation:0 animatedWithDuration:0.06f completion:completion];
 					}];
 				}];
 			}];
 		}];
 	}];
+
+//	[UIView animateWithDuration:.16 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+//		[self moveHorizontallyToLocation:30*movementDirection];
+//	} completion:^(BOOL finished){
+//		[UIView animateWithDuration:.1 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+//			[self moveHorizontallyToLocation:0];
+//		} completion:^(BOOL finished){
+//			[UIView animateWithDuration:.12 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+//				[self moveHorizontallyToLocation:16*movementDirection];
+//			} completion:^(BOOL finished){
+//				[UIView animateWithDuration:.08 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+//					[self moveHorizontallyToLocation:0];
+//				} completion:^(BOOL finished){
+//					[UIView animateWithDuration:.08 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+//						[self moveHorizontallyToLocation:6*movementDirection];
+//					} completion:^(BOOL finished){
+//						[UIView animateWithDuration:.06 delay:0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+//							[self moveHorizontallyToLocation:0];
+//						} completion:^(BOOL finished){
+//							if (completion)
+//								completion();
+//						}];
+//					}];
+//				}];
+//			}];
+//		}];
+//	}];
 }
 
 - (BOOL)isMenuOpen
@@ -465,7 +590,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 //		}
 	}
 	
-	rect.size.width -= slideOffset;
+//	rect.size.width -= slideOffset;
 
 	if (menu == RUSlideNavigationController_MenuType_Right)
 	{
@@ -520,22 +645,22 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 #pragma mark - Getters
 //- (UITapGestureRecognizer *)tapRecognizer
 //{
-//	if (self.tapRecognizer == nil)
+//	if (_tapRecognizer == nil)
 //	{
 //		_tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapDetected:)];
 //	}
 //	
-//	return self.tapRecognizer;
+//	return _tapRecognizer;
 //}
 
 - (UIPanGestureRecognizer *)panRecognizer
 {
-	if (self.panRecognizer == nil)
+	if (_panRecognizer == nil)
 	{
 		_panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panDetected:)];
 	}
 	
-	return self.panRecognizer;
+	return _panRecognizer;
 }
 
 #pragma mark - Setters
@@ -562,6 +687,9 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 		case RUSlideMenuNavigationController_panGestureState_View:
 			return self.view;
+
+		case RUSlideMenuNavigationController_panGestureState_None:
+			return nil;
 	}
 
 	NSAssert(false, @"unhandled");
@@ -606,7 +734,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 		if (horizontalPanLocation >= self.minXForDragging && horizontalPanLocation <= self.maxXForDragging)
 		{
-			[self moveHorizontallyToLocation:horizontalPanLocation];
+			[self moveHorizontallyToLocation:horizontalPanLocation animatedWithDuration:0 completion:nil];
 		}
 	}
 	else if (aPanRecognizer.state == UIGestureRecognizerStateEnded)
@@ -728,11 +856,12 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 }
 
 #pragma mark - Transformation
--(void)updateCurrentViewControllerForSlideUseTransform
+- (void)updateTransformationForView:(UIView*)view atHorizontalLocation:(CGFloat)location
 {
-	CGFloat viewOriginX = CGRectGetMinX(self.animatableScreenShotImageView.frame);
-	RUSlideNavigationController_MenuType menuTypeForHorizontalLocation = [self menuTypeForHorizontalLocation:viewOriginX];
-	CGFloat horizontalProgress = [self horizontalProgressForMenuType:menuTypeForHorizontalLocation xLocation:viewOriginX];
+	kRUConditionalReturn(view == nil, YES);
+//	CGFloat viewOriginX = CGRectGetMinX(self.animatableScreenShotImageView.frame);
+	RUSlideNavigationController_MenuType menuTypeForHorizontalLocation = [self menuTypeForHorizontalLocation:location];
+	CGFloat horizontalProgress = [self horizontalProgressForMenuType:menuTypeForHorizontalLocation xLocation:location];
 
 	UIViewController* currentViewControllerForPossibleDisplayActions = self.currentViewControllerForPossibleDisplayActions;
 	kRUConditionalReturn(currentViewControllerForPossibleDisplayActions == nil, YES);
@@ -780,7 +909,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 //		}
 //	}
 
-	[self.animatableScreenShotImageView.layer setTransform:transform];
+	[view.layer setTransform:transform];
 //	[currentViewControllerForPossibleDisplayActions.view setHidden:willHide];
 
 //	[currentViewControllerForPossibleDisplayActions.view.layer setTransform:transform];
