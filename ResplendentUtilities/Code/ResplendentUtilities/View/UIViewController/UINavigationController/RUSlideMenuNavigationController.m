@@ -101,9 +101,9 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 	[self updateMenuFrameAndTransformAccordingToOrientation];
 
-	if (self.animatableScreenShotImageView)
+	if (self.animatableScreenShotBackgroundView)
 	{
-		[self.animatableScreenShotImageView.superview bringSubviewToFront:self.animatableScreenShotImageView];
+		[self.animatableScreenShotBackgroundView.superview bringSubviewToFront:self.animatableScreenShotBackgroundView];
 	}
 }
 
