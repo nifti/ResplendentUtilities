@@ -214,6 +214,9 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 		[weakAnimatableScreenShotImageView_forFrameSet setFrame:(CGRect){
 			.size	= rect.size,
 		}];
+
+		[weakAnimatableScreenShotBackgroundView_forFrameSet.superview bringSubviewToFront:weakAnimatableScreenShotBackgroundView_forFrameSet];
+
 		animationBlock();
 	};
 
