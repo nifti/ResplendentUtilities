@@ -181,7 +181,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 			_animatableScreenShotImageView = [[UIImageView alloc]initWithImage:snapshotImage];
 			NSAssert(CGSizeEqualToSize(snapshotImage.size, self.view.bounds.size), @"unhandled");
 			[self.animatableScreenShotImageView setUserInteractionEnabled:YES];
-			[self.animatableScreenShotImageView setBackgroundColor:[UIColor redColor]];
+			[self.animatableScreenShotImageView setBackgroundColor:[UIColor clearColor]];
 			[self.animatableScreenShotImageView setContentMode:UIViewContentModeScaleAspectFill];
 			[self.animatableScreenShotBackgroundView addSubview:self.animatableScreenShotImageView];
 		}
@@ -865,14 +865,14 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	kRUConditionalReturn(view == nil, YES);
 	RUSlideNavigationController_MenuType menuTypeForHorizontalLocation = [self menuTypeForHorizontalLocation:location];
 	CGFloat horizontalProgress = [self horizontalProgressForMenuType:menuTypeForHorizontalLocation xLocation:location];
-	RUDLog(@"horizontalProgress: %f",horizontalProgress);
+//	RUDLog(@"horizontalProgress: %f",horizontalProgress);
 
 	UIViewController* currentViewControllerForPossibleDisplayActions = self.currentViewControllerForPossibleDisplayActions;
 	kRUConditionalReturn(currentViewControllerForPossibleDisplayActions == nil, YES);
 
 	CGFloat const progressToXTranslateDistanceRatio = -981.0f;
 	CGFloat xTranslateDistance = pow(horizontalProgress, 2.0f) * progressToXTranslateDistanceRatio;
-	RUDLog(@"xTranslateDistance: %f",xTranslateDistance);
+//	RUDLog(@"xTranslateDistance: %f",xTranslateDistance);
 	
 	CGFloat angle = -horizontalProgress * M_PI_4;
 	
@@ -883,10 +883,10 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 	CGFloat const progressToZTranslateDistanceRatio = -1200.0f;
 	CGFloat zTranslateDistance = horizontalProgress * progressToZTranslateDistanceRatio;
-	RUDLog(@"zTranslateDistance: %f",zTranslateDistance);
+//	RUDLog(@"zTranslateDistance: %f",zTranslateDistance);
 	transform = CATransform3DTranslate(transform, 0, 0, zTranslateDistance);
 
-	[view.layer setZPosition:ceil(CGFLOAT_MAX / 2.0f)];
+//	[view.layer setZPosition:ceil(CGFLOAT_MAX / 2.0f)];
 	[view.layer setTransform:transform];
 }
 
