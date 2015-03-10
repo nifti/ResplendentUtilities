@@ -80,6 +80,8 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 -(void)setPanRecognizerState:(RUSlideMenuNavigationController_panGestureState)panRecognizerState;
 
+-(CGFloat)animatableViewLandingRightSidePaddingWidthToXTransformationRatioMappingWidthClosestToWidth:(CGFloat)width;
+
 @end
 
 
@@ -911,7 +913,28 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	}
 
 	NSAssert(false, @"unhandled");
+	CGFloat closestWidth = [self animatableViewLandingRightSidePaddingWidthToXTransformationRatioMappingWidthClosestToWidth:width];
+	if (closestWidth != width)
+	{
+		return [self animatableViewLandingRightSidePaddingForWidth:closestWidth];
+	}
+
 	return 0;
+}
+
+-(CGFloat)animatableViewLandingRightSidePaddingWidthToXTransformationRatioMappingWidthClosestToWidth:(CGFloat)width
+{
+	CGFloat closestWidth = 0.0f;
+	for (NSNumber* animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping_width in self.animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping)
+	{
+		if (fabs(width - animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping_width.floatValue) <
+			fabs(width - closestWidth))
+		{
+			closestWidth = animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping_width.floatValue;
+		}
+	}
+
+	return closestWidth;
 }
 
 -(CGFloat)animatableViewLandingRightSidePaddingForCurrentWidth
