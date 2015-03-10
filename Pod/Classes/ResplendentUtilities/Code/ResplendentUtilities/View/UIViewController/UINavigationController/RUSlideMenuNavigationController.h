@@ -24,10 +24,16 @@
 
 @property (nonatomic, strong) UIView* defaultRightMenuView;
 @property (nonatomic, strong) UIView* defaultLeftMenuView;
+@property (nonatomic, readonly) UIView* currentViewControllerMenuView;
 
 @property (nonatomic, strong) id <RUSlideNavigationController_Animator> menuAnimator;
 
 @property (nonatomic, assign) UIEdgeInsets menuViewFrameInsets;
+
+@property (nonatomic, assign) CGFloat animatableViewLandingRightSidePadding;
+@property (nonatomic, strong) NSDictionary* animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping;
+-(CGFloat)animatableViewLandingRightSidePaddingForWidth:(CGFloat)width;
+-(CGFloat)animatableViewLandingRightSidePaddingForCurrentWidth;
 
 - (void)bounceMenu:(RUSlideNavigationController_MenuType)menu withCompletion:(void (^)())completion;
 - (void)openMenu:(RUSlideNavigationController_MenuType)menu withCompletion:(void (^)())completion;
@@ -38,5 +44,7 @@
 
 //for subclassing
 @property (nonatomic, readonly) UIImage* imageForCurrentSnapshot;
+
+- (void)willDisplaySideMenuType:(RUSlideNavigationController_MenuType)menu withSideMenuView:(UIView*)sideMenuView forViewController:(UIViewController<RUSlideNavigationController_DisplayDelegate>*)vc;
 
 @end

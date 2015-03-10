@@ -11,6 +11,7 @@
 #import "RUConditionalReturn.h"
 #import "UIView+RUSnapshot.h"
 #import "UIViewController+RUStatusBarHeight.h"
+#import "RUClassOrNilUtil.h"
 
 
 
@@ -37,7 +38,6 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 @property (nonatomic, readonly) UIViewController* currentViewControllerForPossibleDisplayActions;
 @property (nonatomic, readonly) UIViewController<RUSlideNavigationController_DisplayDelegate>* currentViewControllerForDisplayActions;
-@property (nonatomic, readonly) UIView* currentViewControllerMenuView;
 -(UIView *)currentViewControllerMenuViewForMenuType:(RUSlideNavigationController_MenuType)menuType;
 -(UIView *)defaultMenuViewForMenuType:(RUSlideNavigationController_MenuType)menuType;
 
@@ -432,6 +432,7 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 
 	if (menuView.superview == nil)
 	{
+		[self willDisplaySideMenuType:menu withSideMenuView:menuView forViewController:currentViewControllerForDisplayActions];
 		if ([currentViewControllerForDisplayActions respondsToSelector:@selector(ru_slideNavigationController_willDisplayMenuType:)])
 		{
 			[currentViewControllerForDisplayActions ru_slideNavigationController_willDisplayMenuType:menu];
@@ -455,26 +456,6 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	[self updateMenuFrameAndTransformAccordingToOrientationWithMenu:menu];
 	
 	[self.menuAnimator prepareMenuForAnimation:menu];
-}
-
-- (BOOL)shouldDisplayMenu:(RUSlideNavigationController_MenuType)menu forViewController:(UIViewController *)vc
-{
-	BOOL vc_conformsTo_RUSlideNavigationController_DisplayDelegate = [vc conformsToProtocol:@protocol(RUSlideNavigationController_DisplayDelegate)];
-	if (vc_conformsTo_RUSlideNavigationController_DisplayDelegate)
-	{
-		if ([vc respondsToSelector:@selector(ru_slideNavigationController_shouldDisplayMenuType:)])
-		{
-			if ([(id<RUSlideNavigationController_DisplayDelegate>)vc ru_slideNavigationController_shouldDisplayMenuType:menu] == NO)
-			{
-				return NO;
-			}
-		}
-	}
-
-	return ((vc_conformsTo_RUSlideNavigationController_DisplayDelegate &&
-			 [vc respondsToSelector:@selector(ru_slideNavigationController_viewForMenuType:)]) ?
-			[(id<RUSlideNavigationController_DisplayDelegate>)vc ru_slideNavigationController_viewForMenuType:menu] :
-			(menu == RUSlideNavigationController_MenuType_Left ? self.defaultLeftMenuView : self.defaultRightMenuView)) != nil;
 }
 
 - (void)toggleLeftMenu
@@ -870,8 +851,8 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	UIViewController* currentViewControllerForPossibleDisplayActions = self.currentViewControllerForPossibleDisplayActions;
 	kRUConditionalReturn(currentViewControllerForPossibleDisplayActions == nil, YES);
 
-	CGFloat const progressToXTranslateDistanceRatio = -981.0f;
-	CGFloat xTranslateDistance = pow(horizontalProgress, 2.0f) * progressToXTranslateDistanceRatio;
+	CGFloat animatableViewLandingRightSidePaddingForCurrentWidth = self.animatableViewLandingRightSidePaddingForCurrentWidth;
+	CGFloat xTranslateDistance = pow(horizontalProgress, 2.0f) * animatableViewLandingRightSidePaddingForCurrentWidth;
 //	RUDLog(@"xTranslateDistance: %f",xTranslateDistance);
 	
 	CGFloat angle = -horizontalProgress * M_PI_4;
@@ -896,6 +877,73 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	UIImage* imageForCurrentSnapshot = [self.view ruGetSnapshotFromWindow];
 
 	return imageForCurrentSnapshot;
+}
+
+#pragma mark - animatableViewLandingRightSidePadding
+-(void)setAnimatableViewLandingRightSidePadding:(CGFloat)animatableViewLandingRightSidePadding
+{
+	kRUConditionalReturn(self.animatableViewLandingRightSidePadding == animatableViewLandingRightSidePadding, NO);
+
+	_animatableViewLandingRightSidePadding = animatableViewLandingRightSidePadding;
+
+	[self.view setNeedsLayout];
+}
+
+-(void)setAnimatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping:(NSDictionary *)animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping
+{
+	kRUConditionalReturn(self.animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping == animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping, NO);
+	kRUConditionalReturn([self.animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping isEqual:animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping], NO);
+
+	_animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping = [animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping copy];
+
+	[self.view setNeedsLayout];
+}
+
+-(CGFloat)animatableViewLandingRightSidePaddingForWidth:(CGFloat)width
+{
+	NSNumber* animatableViewLandingRightSidePaddingWidthToXTransformationRatio = [self.animatableViewLandingRightSidePaddingWidthToXTransformationRatioMapping objectForKey:@(width)];
+	if (animatableViewLandingRightSidePaddingWidthToXTransformationRatio)
+	{
+		if (kRUNumberOrNil(animatableViewLandingRightSidePaddingWidthToXTransformationRatio))
+		{
+			return ceil(self.animatableViewLandingRightSidePadding * animatableViewLandingRightSidePaddingWidthToXTransformationRatio.floatValue);
+		}
+	}
+
+	NSAssert(false, @"unhandled");
+	return 0;
+}
+
+-(CGFloat)animatableViewLandingRightSidePaddingForCurrentWidth
+{
+	return [self animatableViewLandingRightSidePaddingForWidth:CGRectGetWidth(self.view.bounds)];
+}
+
+#pragma mark - Should Display
+- (BOOL)shouldDisplayMenu:(RUSlideNavigationController_MenuType)menu forViewController:(UIViewController *)vc
+{
+	BOOL vc_conformsTo_RUSlideNavigationController_DisplayDelegate = [vc conformsToProtocol:@protocol(RUSlideNavigationController_DisplayDelegate)];
+	if (vc_conformsTo_RUSlideNavigationController_DisplayDelegate)
+	{
+		if ([vc respondsToSelector:@selector(ru_slideNavigationController_shouldDisplayMenuType:)])
+		{
+			if ([(id<RUSlideNavigationController_DisplayDelegate>)vc ru_slideNavigationController_shouldDisplayMenuType:menu] == NO)
+			{
+				return NO;
+			}
+		}
+	}
+	
+	return ((vc_conformsTo_RUSlideNavigationController_DisplayDelegate &&
+			 [vc respondsToSelector:@selector(ru_slideNavigationController_viewForMenuType:)]) ?
+			[(id<RUSlideNavigationController_DisplayDelegate>)vc ru_slideNavigationController_viewForMenuType:menu] :
+			(menu == RUSlideNavigationController_MenuType_Left ? self.defaultLeftMenuView : self.defaultRightMenuView)) != nil;
+}
+
+#pragma mark - Will Display
+- (void)willDisplaySideMenuType:(RUSlideNavigationController_MenuType)menu withSideMenuView:(UIView*)sideMenuView forViewController:(UIViewController<RUSlideNavigationController_DisplayDelegate>*)vc
+{
+	
 }
 
 @end
