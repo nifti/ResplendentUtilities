@@ -726,36 +726,39 @@ typedef NS_ENUM(NSInteger, RUSlideMenuNavigationController_panGestureState) {
 	}
 	else if (aPanRecognizer.state == UIGestureRecognizerStateEnded)
 	{
-		CGFloat horizontalPanLocationWithVelocity = self.horizontalPanLocationWithVelocity;
-		CGPoint velocity = [aPanRecognizer velocityInView:aPanRecognizer.view];
-
-		// If the speed is high enough follow direction
-		if (fabs(velocity.x) >= kRUSlideMenuNavigationController_MENU_FAST_VELOCITY_FOR_SWIPE_FOLLOW_DIRECTION)
+		if (self.currentViewControllerMenuView)
 		{
-			BOOL shouldClose = ((velocity.x > 0) ?
-								(horizontalPanLocationWithVelocity < 0) :
-								(horizontalPanLocationWithVelocity > 0));
-			if (shouldClose)
+			CGFloat horizontalPanLocationWithVelocity = self.horizontalPanLocationWithVelocity;
+			CGPoint velocity = [aPanRecognizer velocityInView:aPanRecognizer.view];
+			
+			// If the speed is high enough follow direction
+			if (fabs(velocity.x) >= kRUSlideMenuNavigationController_MENU_FAST_VELOCITY_FOR_SWIPE_FOLLOW_DIRECTION)
 			{
-				[self closeMenuWithDuration:kRUSlideMenuNavigationController_MENU_QUICK_SLIDE_ANIMATION_DURATION andCompletion:nil];
+				BOOL shouldClose = ((velocity.x > 0) ?
+									(horizontalPanLocationWithVelocity < 0) :
+									(horizontalPanLocationWithVelocity > 0));
+				if (shouldClose)
+				{
+					[self closeMenuWithDuration:kRUSlideMenuNavigationController_MENU_QUICK_SLIDE_ANIMATION_DURATION andCompletion:nil];
+				}
+				else
+				{
+					if ([self shouldDisplayMenu:menuFromHorizontalPanLocationWithVelocity forViewController:self.currentViewControllerForPossibleDisplayActions])
+					{
+						[self openMenu:menuFromHorizontalPanLocationWithVelocity withCompletion:nil];
+					}
+				}
 			}
 			else
 			{
-				if ([self shouldDisplayMenu:menuFromHorizontalPanLocationWithVelocity forViewController:self.currentViewControllerForPossibleDisplayActions])
+				if (horizontalPanLocationWithVelocity < (self.horizontalSize - self.slideOffset)/2)
+				{
+					[self closeMenuWithCompletion:nil];
+				}
+				else
 				{
 					[self openMenu:menuFromHorizontalPanLocationWithVelocity withCompletion:nil];
 				}
-			}
-		}
-		else
-		{
-			if (horizontalPanLocationWithVelocity < (self.horizontalSize - self.slideOffset)/2)
-			{
-				[self closeMenuWithCompletion:nil];
-			}
-			else
-			{
-				[self openMenu:menuFromHorizontalPanLocationWithVelocity withCompletion:nil];
 			}
 		}
 	}
